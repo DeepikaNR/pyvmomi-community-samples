@@ -1,0 +1,86 @@
+from pyVim.connect import SmartConnect, Disconnect
+from pyVmomi import vim
+import ssl
+
+def get_vm_by_name(content, vm_name):
+    """
+    Retrieve a VM object by its name.
+    """
+    obj_view = content.viewManager.CreateContainerView(content.rootFolder, [vim.VirtualMachine], True)
+    vm_list = obj_view.view
+    obj_view.Destroy()
+    for vm in vm_list:
+        if vm.name == vm_name:
+            return vm
+    return None
+
+def power_off_vm(vm):
+    """
+    Power off the VM if it is powered on.
+    """
+    if vm.runtime.powerState == "poweredOn":
+        print(f"Powering off VM: {vm.name}")
+        task = vm.PowerOff()
+        wait_for_task(task)
+        print(f"VM {vm.name} is now powered off.")
+    else:
+        print(f"VM {vm.name} is already powered off.")
+def power_on_vm(vm):
+    """
+    Power off the VM if it is powered on.
+    """
+    if vm.runtime.powerState != "poweredOn":
+        print(f"Powering on VM: {vm.name}")
+        task = vm.PowerOn()
+        wait_for_task(task)
+        print(f"VM {vm.name} is now powered on.")
+    else:
+        print(f"VM {vm.name} is already powered on.")
+
+def wait_for_task(task):
+    """
+    Wait for a vSphere task to complete.
+    """
+    while task.info.state == vim.TaskInfo.State.running:
+        continue
+    if task.info.state == vim.TaskInfo.State.success:
+        return task.info.result
+    else:
+        raise Exception(f"Task failed: {task.info.error.msg}")
+
+def main():
+    # vCenter connection details
+    vcenter_host = "{{vsphere_server}}"
+    vcenter_user = "{{vsphere_user}}"
+    vcenter_password = "{{vsphere_password}}"
+    vm_name = "{{vm_name}}"
+
+
+    # Disable SSL certificate verification
+    context = ssl._create_unverified_context()
+
+    # Connect to vCenter
+    si = SmartConnect(host=vcenter_host, user=vcenter_user, pwd=vcenter_password, sslContext=context)
+    print("Connected to vCenter")
+
+    try:
+        # Get the content object
+        content = si.RetrieveContent()
+
+        # Find the VM by name
+        vm = get_vm_by_name(content, vm_name)
+        if not vm:
+            print(f"VM {vm_name} not found.")
+            return
+
+        # Power off the VM
+        power_off_vm(vm)
+        power_on_vm(vm)
+
+    finally:
+        # Disconnect from vCenter
+        Disconnect(si)
+        print("Disconnected from vCenter")
+
+if __name__ == "__main__":
+    main()
